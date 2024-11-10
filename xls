@@ -1,0 +1,50 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from glob import glob
+
+# Path to your files, adjust if needed
+file_paths = [
+    "n_device_1_0080E1150510BDE6_2024-07-11_19-10_to_20-00.csv",
+    "n_device_2_0080E1150533F233_2024-07-11_19-10_to_20-00.csv",
+    "n_device_3_0080E1150510B77B_2024-07-11_19-10_to_20-00.csv",
+    "n_device_4_0080E1150533ECF3_2024-07-11_19-10_to_20-00.csv"
+]
+
+# Device labels for the plot
+device_labels = [
+    "Device 1 (ID: 0080E1150510BDE6)",
+    "Device 2 (ID: 0080E1150533F233)",
+    "Device 3 (ID: 0080E1150510B77B)",
+    "Device 4 (ID: 0080E1150533ECF3)"
+]
+
+# Plotting CO2 levels with trend
+plt.figure(figsize=(12, 8))
+
+for file_path, label in zip(file_paths, device_labels):
+    # Load each file
+    data = pd.read_csv(file_path)
+    
+    # Ensure 'Datetime' is in datetime format
+    data['Datetime'] = pd.to_datetime(data['Datetime'])
+    
+    # Set Datetime as index for easier plotting
+    data.set_index('Datetime', inplace=True)
+    
+    # Plot CO2 data
+    plt.plot(data.index, data['CO2'], label=label)
+    
+    # Plot a moving average to show trend
+    #data['CO2_MA'] = data['CO2'].rolling(window=10, min_periods=1).mean()
+    #plt.plot(data.index, data['CO2_MA'], linestyle='--', alpha=0.7, label=f"{label} (MA)")
+
+# Configure plot
+plt.title('CO2 Levels with Moving Average Trend (All Devices)')
+plt.xlabel('Timestamp')
+plt.ylabel('CO2 Level (ppm)')
+plt.legend(title='Devices')
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+# Show plot
+plt.show()

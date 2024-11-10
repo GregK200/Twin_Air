@@ -1,0 +1,78 @@
+import pandas as pd
+import numpy as np
+
+# Load the CSV file
+file_path = 'C:\\Users\\Greg\\Downloads\\Marina_Mentou_Experiments - data (5).csv'
+data = pd.read_csv(file_path, low_memory=False, decimal=',', thousands=',')
+
+# Convert the 'MC_PM25' to numeric (removing commas if present) and handle non-numeric values
+data['MC_PM25'] = pd.to_numeric(data['MC_PM25'], errors='coerce')
+
+# Convert the 'Datetime' column to datetime format
+data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce')
+
+# Drop rows with missing PM2.5 or Datetime values
+data_clean = data.dropna(subset=['MC_PM25', 'Datetime'])
+
+# Extract the date from the 'Datetime' column for easier filtering
+data_clean['Date'] = data_clean['Datetime'].dt.date
+
+# Filter the data for May 10, 2024
+specific_date = pd.to_datetime('2024-05-10').date()  # Corrected date
+daily_data = data_clean[data_clean['Date'] == specific_date].copy()  # Use copy to avoid warnings
+
+# Add 'Hour' and 'Minute' columns for easy filtering by time
+daily_data['Hour'] = daily_data['Datetime'].dt.hour
+daily_data['Minute'] = daily_data['Datetime'].dt.minute
+
+# Define start and end time
+start_time = '18:00'
+end_time = '21:00'
+
+# Convert start and end time to datetime for filtering
+start_time_dt = pd.to_datetime(f'{specific_date} {start_time}')
+end_time_dt = pd.to_datetime(f'{specific_date} {end_time}')
+
+# Filter the data within the specific time range
+filtered_data = daily_data[(daily_data['Datetime'] >= start_time_dt) & (daily_data['Datetime'] <= end_time_dt)]
+
+# Device IDs
+device_1_id = '0080E1150510BDE6'
+device_2_id = '0080E1150533F233'
+
+# Select the columns to save
+columns_to_save = ['Datetime', 'Relative_Humidity', 'Temperature', 'MC_PM25', 'NC_PM25']
+
+# Filter the data for each device
+device_1_data_filtered = filtered_data[filtered_data['Device_ID'] == device_1_id][columns_to_save].copy()
+device_2_data_filtered = filtered_data[filtered_data['Device_ID'] == device_2_id][columns_to_save].copy()
+
+# Generalized sampling function
+def apply_sampling(df, freq, label, col):
+    df[label] = np.nan  # Initialize with NaN
+    df = df.sort_values(by='Datetime')
+    for time_block, group in df.groupby(pd.Grouper(key='Datetime', freq=freq)):
+        if not group.empty:
+            first_index = group.index[0]
+            df.loc[first_index, label] = df.loc[first_index, col]  # Copy the first value
+        df[label] = df[label].ffill()
+    return df
+
+# Apply all sampling intervals to both devices
+sampling_intervals = ['5T', '10T', '15T', '2.5T', '7.5T']
+for interval in sampling_intervals:
+    device_1_data_filtered = apply_sampling(device_1_data_filtered, interval, f'{interval}_sample', 'MC_PM25')
+    device_1_data_filtered = apply_sampling(device_1_data_filtered, interval, f'{interval}_sample_NC', 'NC_PM25')
+    
+    device_2_data_filtered = apply_sampling(device_2_data_filtered, interval, f'{interval}_sample', 'MC_PM25')
+    device_2_data_filtered = apply_sampling(device_2_data_filtered, interval, f'{interval}_sample_NC', 'NC_PM25')
+
+# Replace colons in the time strings to make valid filenames for Windows
+start_time_str = start_time.replace(':', '-')
+end_time_str = end_time.replace(':', '-')
+
+# Save the filtered dataset with all sampling intervals to a single CSV file
+device_1_data_filtered.to_csv(f'n_device_1_{device_1_id}_{specific_date}_{start_time_str}_to_{end_time_str}_with_sampling.csv', index=False)
+device_2_data_filtered.to_csv(f'n_device_2_{device_2_id}_{specific_date}_{start_time_str}_to_{end_time_str}_with_sampling.csv', index=False)
+
+print(f"CSV files created for Device 1 and Device 2 from {start_time} to {end_time} on {specific_date} with all sampling intervals.")
